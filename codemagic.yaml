@@ -1,0 +1,83 @@
+workflows:
+  ios-app-store-release:
+    name: iOS App Store Release
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+
+    environment:
+      flutter: stable
+      xcode: latest
+      groups:
+        - H3Apps
+      vars:
+        BUNDLE_ID: com.h3apps.businessCalculators
+        APP_ID: "6449375525"
+
+    cache:
+      cache_paths:
+        - ~/.cocoapods
+
+    scripts:
+      - name: Debug environment
+        script: |
+          echo "Issuer ID is set: $(if [ -n "$APP_STORE_CONNECT_ISSUER_ID" ]; then echo YES; else echo NO - MISSING; fi)"
+          echo "Key ID is set: $(if [ -n "$APP_STORE_CONNECT_KEY_IDENTIFIER" ]; then echo YES; else echo NO - MISSING; fi)"
+          echo "Private key is set: $(if [ -n "$APP_STORE_CONNECT_PRIVATE_KEY" ]; then echo YES; else echo NO - MISSING; fi)"
+          echo "Certificate is set: $(if [ -n "$CM_CERTIFICATE" ]; then echo YES; else echo NO - MISSING; fi)"
+          echo "Cert password is set: $(if [ -n "$CM_CERTIFICATE_PASSWORD" ]; then echo YES; else echo NO - MISSING; fi)"
+
+      - name: Install CocoaPods
+        script: |
+          gem install cocoapods
+          pod --version
+
+      - name: Install Flutter & iOS dependencies
+        script: |
+          flutter pub get
+          cd ios
+          pod install
+          cd ..
+
+      - name: Set up code signing
+        script: |
+          # 1. Initialize Keychain
+          keychain initialize
+
+          # 2. Reconstruct the .p12 file from the variable
+          echo $CM_CERTIFICATE | base64 --decode > /tmp/certificate.p12
+
+          # 3. Import the certificate into the keychain
+          keychain add-certificates \
+            --certificate /tmp/certificate.p12 \
+            --certificate-password $CM_CERTIFICATE_PASSWORD
+
+          # 4. Reconstruct the Provisioning Profile
+          # We must put it in the exact folder Xcode searches
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo $CM_PROVISIONING_PROFILES | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/build.mobileprovision
+          echo "Provisioning profile size: $(wc -c < ~/Library/MobileDevice/Provisioning\ Profiles/build.mobileprovision) bytes"
+
+          # 5. Finalize
+          # Use bundle-ids (plural) to match your app ID
+          xcode-project use-profiles
+
+      - name: Build IPA
+        script: |
+          # Force 1.0.1 and build 11 (or whatever is higher than your last attempt)
+          flutter build ipa --release \
+            --export-options-plist=/Users/builder/export_options.plist \
+            --build-name=1.0.2 \
+            --build-number=2
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - ios/Podfile.lock
+
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
+        beta_groups:
+          - Internal Testers
