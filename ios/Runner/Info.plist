@@ -51,7 +51,7 @@
 	<true/>
 	<!-- Google Mobile Ads App ID -->
     <key>GADApplicationIdentifier</key>
-    <string>ca-app-pub-9664590269609351~6212944358</string>
+    <string>ca-app-pub-9664590269609351~8008783342</string>
 
     <!-- Full SKAdNetwork list required by Google -->
     <key>SKAdNetworkItems</key>
