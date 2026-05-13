@@ -66,7 +66,7 @@ workflows:
           # Force 1.0.1 and build 11 (or whatever is higher than your last attempt)
           flutter build ipa --release \
             --export-options-plist=/Users/builder/export_options.plist \
-            --build-name=1.0.2 \
+            --build-name=1.0.3 \
             --build-number=2
 
     artifacts:
